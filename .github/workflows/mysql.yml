@@ -35,11 +35,29 @@ jobs:
         with:
           images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
 
-      - name: Build and push Docker image
-        uses: docker/build-push-action@ad44023a93711e3deb337508980b4b5e9bcdc5dc
-        with:
-          file: mysql/Dockerfile
-          context: .
-          push: true
-          tags: ${{ steps.meta.outputs.tags }}
-          labels: ${{ steps.meta.outputs.labels }}
+      
+          
+      - name: create MYSQL Root Password Secret
+        run: echo "${{ secrets.MYSQL_ROOT_PASSWORD }}" > MYSQL_ROOT_PASSWORD.txt
+
+      - name: create MYSQL User Secret
+        run: echo "${{ secrets.MYSQL_USER }}" > MYSQL_USER.txt
+
+      - name: create MYSQL User Password Secret
+        run: echo "${{ secrets.MYSQL_PASSWORD }}" > MYSQL_PASSWORD.txt
+
+      - name: create MYSQL DB Secret
+        run: echo "${{ secrets.MYSQL_DB }}" > MYSQL_DB.txt
+
+      - name: Build the Docker image
+        run: DOCKER_BUILDKIT=1 docker build
+              --file mysql/Dockerfile 
+              --tag ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest 
+              --build-arg number_of_shards=5 \
+              --build-arg MYSQL_ROOT_PASSWORD=${{ secrets.MYSQL_ROOT_PASSWORD }} 
+              --build-arg MYSQL_USER=${{ secrets.MYSQL_USER }} 
+              --build-arg MYSQL_PASSWORD=${{ secrets.MYSQL_PASSWORD }} 
+              --build-arg MYSQL_DB=${{ secrets.MYSQL_DB }} 
+
+      - name: Push Image
+        run: docker push ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest
