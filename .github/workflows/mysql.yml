@@ -53,11 +53,11 @@ jobs:
         run: DOCKER_BUILDKIT=1 docker build
               --file mysql/Dockerfile 
               --tag ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest 
-              --secret id=MYSQL_ROOT_PASSWORD,src=MYSQL_ROOT_PASSWORD.txt
-              --secret id=MYSQL_USER,src=MYSQL_USER.txt
-              --secret id=MYSQL_PASSWORD,src=MYSQL_PASSWORD.txt
-              --secret id=MYSQL_DB,src=MYSQL_DB.txt .
-
+              --build-arg number_of_shards=5 \
+              --build-arg MYSQL_ROOT_PASSWORD=${{ secrets.MYSQL_ROOT_PASSWORD }} 
+              --build-arg MYSQL_USER=${{ secrets.MYSQL_USER }} 
+              --build-arg MYSQL_PASSWORD=${{ secrets.MYSQL_PASSWORD }} 
+              --build-arg MYSQL_DB=${{ secrets.MYSQL_DB }} 
 
       - name: Push Image
         run: docker push ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest
