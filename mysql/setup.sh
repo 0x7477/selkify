@@ -95,5 +95,5 @@ echo "deploying DB"
 /usr/bin/mysqld --user=mysql --bootstrap --verbose=0 --skip-name-resolve --skip-networking=0 < /scripts/init.sql
 
 
-exec /usr/bin/mysqld --user=mysql --console --skip-name-resolve --skip-networking=0 $@
+# exec /usr/bin/mysqld --user=mysql --console --skip-name-resolve --skip-networking=0 $@
 
