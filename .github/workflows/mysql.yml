@@ -52,7 +52,7 @@ jobs:
       - name: Build the Docker image
         run: docker build
               --file mysql/Dockerfile 
-              --tag ${{ secrets.DOCKER_USERNAME }}/mysql:latest 
+              --tag ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest 
               --secret id=MYSQL_ROOT_PASSWORD,src=MYSQL_ROOT_PASSWORD.txt
               --secret id=MYSQL_USER,src=MYSQL_USER.txt
               --secret id=MYSQL_PASSWORD,src=MYSQL_PASSWORD.txt
@@ -60,4 +60,4 @@ jobs:
 
 
       - name: Push Image
-        run: docker push ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+        run: docker push ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest
