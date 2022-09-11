@@ -1,5 +1,9 @@
 # syntax = docker/dockerfile:experimental
 FROM alpine
+ARG MYSQL_ROOT_PASSWORD
+ARG MYSQL_USER
+ARG MYSQL_PASSWORD
+ARG MYSQL_DB
 
 RUN apk add --no-cache mariadb mariadb-client mariadb-server-utils pwgen && rm -f /var/cache/apk/*
 
@@ -16,17 +20,13 @@ RUN chmod -R 755 /etc/init.d/
 EXPOSE 3306
 
 RUN mkdir secrets
-RUN --mount=type=secret,id=MYSQL_ROOT_PASSWORD \
-    echo "$MYSQL_ROOT_PASSWORD" >> /secrets/mysql_root_password
+RUN echo "$MYSQL_ROOT_PASSWORD" >> /secrets/mysql_root_password
 
-RUN --mount=type=secret,id=MYSQL_USER \
-    echo "$MYSQL_USER" >> /secrets/mysql_user
+RUN echo "$MYSQL_USER" >> /secrets/mysql_user
 
-RUN --mount=type=secret,id=MYSQL_PASSWORD \
-    echo "$MYSQL_PASSWORD" >> /secrets/mysql_password
+RUN echo "$MYSQL_PASSWORD" >> /secrets/mysql_password
 
-RUN --mount=type=secret,id=MYSQL_DB \
-    echo "MYSQL_DB" >> /secrets/mysql_db
+RUN echo "$MYSQL_DB" >> /secrets/mysql_db
 
 RUN ./scripts/setup.sh
 ENTRYPOINT ["/bin/sh"]
