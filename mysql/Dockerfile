@@ -7,7 +7,7 @@ RUN mkdir -p /docker-entrypoint-initdb.d
 RUN mkdir -p /scripts/pre-exec.d 
 RUN mkdir -p /scripts/pre-init.d 
 
-ADD mysql/run.sh /scripts/run.sh
+# ADD mysql/run.sh /scripts/run.sh
 ADD mysql/init.sql /scripts/init.sql
 
 RUN chmod -R 755 /scripts
