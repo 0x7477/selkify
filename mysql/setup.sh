@@ -1,11 +1,5 @@
 #!/bin/sh
 
-export MYSQL_ROOT_PASSWORD=$(cat /secrets/mysql_root_password)
-
-export MYSQL_USER=$(cat /secrets/mysql_user)
-export MYSQL_PASSWORD=$(cat /secrets/mysql_password)
-export MYSQL_DATABASE=$(cat /secrets/mysql_db)
-
 # execute any pre-init scripts
 for i in /scripts/pre-init.d/*sh
 do
