@@ -197,7 +197,7 @@ public class ChatController : ControllerBase
             var content = "{\"notification\": {\"title\": \"" + title + "\",\"body\": \"" + body + "\"},\"registration_ids\":[" + tokens + "]}";
 
             httpRequest.Content = new StringContent(content, Encoding.UTF8, "application/json");
-            httpRequest.Headers.TryAddWithoutValidation("Authorization", "key=AAAAx8MyjbE:APA91bGRe_YKVb_qA-yXzO0ylfW5PAOJ2J5XUD8Qj6HleookjbkCeAlNS5ueEvT51ux3knxBpw9wJGa_cdpcRkurX6qQiSyqd99KGhgLLYyjU2osl70Sytfs0g_PSuYteQGYtVYA7kNG");
+            httpRequest.Headers.TryAddWithoutValidation("Authorization", Settings.ServerKey);
 
             var response = await clientTest.SendAsync(httpRequest);
         }
