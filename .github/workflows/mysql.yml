@@ -9,7 +9,7 @@ on:
   workflow_dispatch:
 env:
   REGISTRY: ghcr.io
-  IMAGE_NAME: ${{ github.repository }}_mysql:master
+  IMAGE_NAME: ${{ github.repository }}_mysql
 
 jobs:
   build-and-push-image:
@@ -52,7 +52,7 @@ jobs:
       - name: Build the Docker image
         run: DOCKER_BUILDKIT=1 docker build
           --file mysql/Dockerfile
-          --tag ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest
+          --tag ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:master
           --build-arg MYSQL_ROOT_PASSWORD=abcsdjlsdnjsadkjnlds
           --build-arg MYSQL_USER=usr
           --build-arg MYSQL_PASSWORD=pass123 .
