@@ -19,14 +19,16 @@ RUN chmod -R 755 /etc/init.d/
 
 EXPOSE 3306
 
-RUN mkdir secrets
-RUN echo "$MYSQL_ROOT_PASSWORD" >> /secrets/mysql_root_password
+# RUN mkdir secrets
+# RUN echo "$MYSQL_ROOT_PASSWORD" >> /secrets/mysql_root_password
 
-RUN echo "$MYSQL_USER" >> /secrets/mysql_user
+# RUN echo "$MYSQL_USER" >> /secrets/mysql_user
 
-RUN echo "$MYSQL_PASSWORD" >> /secrets/mysql_password
+# RUN echo "$MYSQL_PASSWORD" >> /secrets/mysql_password
 
-RUN echo "$MYSQL_DB" >> /secrets/mysql_db
+# RUN echo "$MYSQL_DB" >> /secrets/mysql_db
 
 RUN ./scripts/setup.sh
-ENTRYPOINT ["/bin/sh"]
+#ENTRYPOINT ["/usr/bin/mysqld ", "--user=mysql", "--console", "--skip-name-resolve", "--skip-networking=0,","$@"]
+
+ENTRYPOINT ["/usr/bin/mysqld","--user=mysql","--console","--skip-name-resolve","--skip-networking=0"]
