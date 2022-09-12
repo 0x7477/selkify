@@ -62,4 +62,4 @@ jobs:
 #          --build-arg MYSQL_PASSWORD=${{ secrets.MYSQL_PASSWORD }} .
 
       - name: Push Image
-        run: docker push ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest
+        run: docker push ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:master
