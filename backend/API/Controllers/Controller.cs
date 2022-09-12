@@ -51,6 +51,6 @@ public class MainController : ControllerBase
     [HttpGet("calendar")]
     public async Task<string> calendar()
     {
-        return await DB.readJSONSQL("SELECT * FROM SELK_APP.CALENDAR;");
+        return await DB.readJSONSQL("SELECT * FROM CALENDAR;");
     }
 }

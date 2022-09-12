@@ -67,7 +67,7 @@ public class ChatController : ControllerBase
         int id = await AccountController.GetID(email, password);
         if (id == 0) return Unauthorized();
 
-        using (var cmd = await DB.getCommand(@"(SELECT ID, NAME, TYPE, TAGS FROM SELK_APP.CHAT WHERE TYPE = ""GROUP"" AND CONCAT(TAGS, ' ', NAME) 
+        using (var cmd = await DB.getCommand(@"(SELECT ID, NAME, TYPE, TAGS FROM CHAT WHERE TYPE = ""GROUP"" AND CONCAT(TAGS, ' ', NAME) 
         LIKE @query) LIMIT @limit " // AND CHAT_PRIVACY_OPTIONS_NAME = 'CLOSED' 
         // @"UNION SELECT u.ID, u.NAME, u.USER_TYPE_NAME TYPE FROM USER u 
         // INNER JOIN USER_TYPE_PERMISSION p ON p.USER_TYPE_NAME = u.USER_TYPE_NAME WHERE CONCAT(u.USER_TYPE_NAME, ' ', NAME) 
@@ -88,7 +88,7 @@ public class ChatController : ControllerBase
         int id = await AccountController.GetID(email, password);
         if (id == 0) return Unauthorized();
 
-        using (var cmd = await DB.getCommand("SELECT * FROM SELK_APP.CHAT_USER cu INNER JOIN CHAT c ON c.ID = cu.CHAT_ID WHERE USER_ID = @id"))
+        using (var cmd = await DB.getCommand("SELECT * FROM CHAT_USER cu INNER JOIN CHAT c ON c.ID = cu.CHAT_ID WHERE USER_ID = @id"))
         {
             cmd.Parameters.AddWithValue("@id", id);
             return Ok(await DB.readJSONSQL(cmd, DB.JSONFormat.Array));
@@ -323,7 +323,7 @@ public class ChatController : ControllerBase
     [NonAction]
     public async Task<bool> HasUserChatPermission(int user, int chat, string permission)
     {
-        using (var cmd = await DB.getCommand("SELECT COUNT(*) FROM SELK_APP.CHAT_USER WHERE USER_ID = @user AND CHAT_ID = @chat AND ROLE IN (SELECT CHAT_ROLE FROM CHAT_ROLE_PERMISSION WHERE CHAT_PERMISSION = @permission);"))
+        using (var cmd = await DB.getCommand("SELECT COUNT(*) FROM CHAT_USER WHERE USER_ID = @user AND CHAT_ID = @chat AND ROLE IN (SELECT CHAT_ROLE FROM CHAT_ROLE_PERMISSION WHERE CHAT_PERMISSION = @permission);"))
         {
             cmd.Parameters.AddWithValue("@user", user);
             cmd.Parameters.AddWithValue("@chat", chat);
