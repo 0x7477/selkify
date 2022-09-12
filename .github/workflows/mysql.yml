@@ -52,10 +52,10 @@ jobs:
       - name: Build the Docker image
         run: DOCKER_BUILDKIT=1 docker build
           --file mysql/Dockerfile
-          --tag ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest
+          --tag ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:master
           --build-arg MYSQL_ROOT_PASSWORD=${{ secrets.MYSQL_ROOT_PASSWORD }}
           --build-arg MYSQL_USER=${{ secrets.MYSQL_USER }}
           --build-arg MYSQL_PASSWORD=${{ secrets.MYSQL_PASSWORD }} .
 
       - name: Push Image
-        run: docker push ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest
+        run: docker push ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:master
