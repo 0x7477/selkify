@@ -29,6 +29,22 @@ public class ChatController : ControllerBase
         }
     }
 
+
+    [HttpGet("{chat_id}/delete")]
+    public async Task<IActionResult> Delete(int chat_id, [FromHeader] string email, [FromHeader] string password)
+    {
+        int id = await AccountController.GetID(email, password);
+        if (id == 0) return Unauthorized();
+
+        if (!await HasUserChatPermission(id, chat_id, "DELETE")) return Unauthorized();
+
+        using (var cmd = await DB.getCommand(@"DELETE FROM CHAT WHERE ID = @chat_id;"))
+        {
+            cmd.Parameters.AddWithValue("@chat_id", chat_id);
+            return Ok(await DB.execSQL(cmd));
+        }
+    }
+
     [HttpGet("{chat_id}/join")]
     public async Task<IActionResult> Join(int chat_id, [FromHeader] string email, [FromHeader] string password)
     {
@@ -96,7 +112,7 @@ public class ChatController : ControllerBase
     }
 
     [HttpPost("")]
-    public async Task<IActionResult> Create([FromForm] string name, [FromForm] string type, [FromForm] string description, [FromForm] string tags, [FromHeader] string email, [FromHeader] string password)
+    public async Task<IActionResult> Create([FromForm] string name, [FromForm] string type, [FromForm] string? description, [FromForm] string? tags, [FromHeader] string email, [FromHeader] string password)
     {
         int id = await AccountController.GetID(email, password);
         if (id == 0) return Unauthorized();
@@ -225,6 +241,26 @@ public class ChatController : ControllerBase
         }
     }
 
+    [HttpGet("{chat}/permissions")]
+    public async Task<IActionResult> GetPermissions(int chat, [FromHeader] string email, [FromHeader] string password)
+    {
+        int id = await AccountController.GetID(email, password);
+        if (id == 0) return Unauthorized();
+
+        //we authentificated our user
+        //is our User authentificated to view?
+
+        //everything is allright
+
+        using (var cmd = await DB.getCommand("SELECT PERMISSION FROM CHAT_ROLE_PERMISSION p INNER JOIN CHAT_USER u ON u.ROLE = p.ROLE WHERE u.USER_ID = @user_id AND u.CHAT_ID = @chat_id;"))
+        {
+            cmd.Parameters.AddWithValue("@chat_id", chat);
+            cmd.Parameters.AddWithValue("@user_id", id);
+
+            return Ok(await DB.readJSONSQL(cmd, DB.JSONFormat.Array));
+        }
+    }
+
     [HttpGet("{chat}/info")]
     public async Task<IActionResult> GetInfo(int chat, [FromHeader] string email, [FromHeader] string password)
     {
@@ -323,7 +359,7 @@ public class ChatController : ControllerBase
     [NonAction]
     public async Task<bool> HasUserChatPermission(int user, int chat, string permission)
     {
-        using (var cmd = await DB.getCommand("SELECT COUNT(*) FROM CHAT_USER WHERE USER_ID = @user AND CHAT_ID = @chat AND ROLE IN (SELECT CHAT_ROLE FROM CHAT_ROLE_PERMISSION WHERE CHAT_PERMISSION = @permission);"))
+        using (var cmd = await DB.getCommand("SELECT COUNT(*) FROM CHAT_USER WHERE USER_ID = @user AND CHAT_ID = @chat AND ROLE IN (SELECT ROLE FROM CHAT_ROLE_PERMISSION WHERE PERMISSION = @permission);"))
         {
             cmd.Parameters.AddWithValue("@user", user);
             cmd.Parameters.AddWithValue("@chat", chat);

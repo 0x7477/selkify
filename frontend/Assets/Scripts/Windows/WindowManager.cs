@@ -127,13 +127,13 @@ public abstract class Window : MonoBehaviour
         open = false;
     }    
 
-    public void Clear(Transform go, int i = 0)
+    public void Clear(Transform go, int i = 0, int stop = 0)
     {
-        Clear(go.gameObject, i);
+        Clear(go.gameObject, i, stop);
     }
-    public void Clear(GameObject go, int i = 0)
+    public void Clear(GameObject go, int i = 0, int stop = 0)
     {
-        for(; i < go.transform.childCount; i++)
+        for(; i < go.transform.childCount - stop; i++)
         {
             GameObject.Destroy(go.transform.GetChild(i).gameObject);
         }
