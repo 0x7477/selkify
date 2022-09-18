@@ -38,6 +38,7 @@ public class WindowManager : MonoBehaviour
     {
         if(Input.GetKeyDown(KeyCode.Escape) && windows[currentWindowID].open)
         {
+            Debug.Log(currentWindowID);
             await windows[currentWindowID].Back();
         }
     }

@@ -29,28 +29,34 @@ public class MainController : ControllerBase
     [HttpGet("connect")]
     public string connect()
     {
-        return "";
-        /*
         using(DB db = new DB())
         {
-            return db.Connection.State.ToString();
+            return db.getConnection().State.ToString();
         }
-        */
     }
 
     [HttpGet("calc")]
-    public async Task<string> calc(int? a, int? b)
+    public async Task<IActionResult> calc(int? a, int? b)
     {
-        var cmd = await DB.getCommand("SELECT @a + @b sum");
-        cmd.Parameters.AddWithValue("@a", a ?? 0);
-        cmd.Parameters.AddWithValue("@b", b ?? 0);
-        
-        return await DB.readJSONSQL(cmd);
+        using(DB db = new DB())
+        {
+            
+            var cmd = db.getCMD("SELECT @a + @b sum");
+            cmd.Parameters.AddWithValue("@a", a ?? 0);
+            cmd.Parameters.AddWithValue("@b", b ?? 0);
+            
+            return Ok(await db.readJSON());
+        }
     }
 
     [HttpGet("calendar")]
-    public async Task<string> calendar()
+    public async Task<IActionResult> calendar()
     {
-        return await DB.readJSONSQL("SELECT * FROM CALENDAR;");
+        using(DB db = new DB())
+        {
+            db.getCMD("SELECT * FROM CALENDAR;");            
+            return Ok(await db.readJSON());
+        }
+
     }
 }

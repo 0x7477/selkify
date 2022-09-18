@@ -2,6 +2,7 @@ using Microsoft.AspNetCore.Mvc;
 using System.Text.Json;
 namespace test.Controllers;
 
+using System.Data;
 using System.Text;
 using Newtonsoft.Json.Linq;
 
@@ -10,25 +11,51 @@ using Newtonsoft.Json.Linq;
 public class ChatController : ControllerBase
 {
 
-    
+
     [HttpPost("{chat_id}/user/{user_id}/role")]
-    public async Task<IActionResult> SetRole(int chat_id, int user_id, [FromForm]string role, [FromHeader] string email, [FromHeader] string password)
+    public async Task<IActionResult> SetRole(int chat_id, int user_id, [FromForm] string role, [FromHeader] string email, [FromHeader] string password)
     {
         int id = await AccountController.GetID(email, password);
         if (id == 0) return Unauthorized();
 
-        if(!await HasUserChatPermission(id, chat_id, "EDIT")) return Unauthorized();
+        if (!await HasUserChatPermission(id, chat_id, "EDIT")) return Unauthorized();
 
-        using (var cmd = await DB.getCommand(@"UPDATE CHAT_USER SET ROLE = @role WHERE CHAT_ID = @chat AND USER_ID = @user"))
+        using (DB db = new DB())
         {
+            var cmd = db.getCMD(@"UPDATE CHAT_USER SET ROLE = @role WHERE CHAT_ID = @chat AND USER_ID = @user");
             cmd.Parameters.AddWithValue("@user", user_id);
             cmd.Parameters.AddWithValue("@role", role);
             cmd.Parameters.AddWithValue("@chat", chat_id);
 
-            return Ok(await DB.execSQL(cmd));
+            return Ok(await db.exec());
         }
     }
 
+
+    [HttpGet("{chat_id}/leave")]
+    public async Task<IActionResult> Leave(int chat_id, [FromHeader] string email, [FromHeader] string password)
+    {
+        int id = await AccountController.GetID(email, password);
+        if (id == 0) return Unauthorized();
+
+        using (DB db = new DB())
+        {
+            var cmd = db.getCMD(@"SELECT USER_ID FROM SELKIFY.CHAT_USER WHERE USER_ID != @user_id AND ROLE = ""ADMIN"";");
+            cmd.Parameters.AddWithValue("@user_id", id);
+
+            var table = await db.read();
+
+            if(table.Rows.Count == 0) return Problem("Group would have no Admin");
+        }
+
+        using (DB db = new DB())
+        {
+            var cmd = db.getCMD(@"DELETE FROM CHAT_USER WHERE CHAT_ID = @chat_id AND USER_ID = @user_id;");
+            cmd.Parameters.AddWithValue("@chat_id", chat_id);
+            cmd.Parameters.AddWithValue("@user_id", id);
+            return Ok(await db.exec());
+        }
+    }
 
     [HttpGet("{chat_id}/delete")]
     public async Task<IActionResult> Delete(int chat_id, [FromHeader] string email, [FromHeader] string password)
@@ -38,10 +65,11 @@ public class ChatController : ControllerBase
 
         if (!await HasUserChatPermission(id, chat_id, "DELETE")) return Unauthorized();
 
-        using (var cmd = await DB.getCommand(@"DELETE FROM CHAT WHERE ID = @chat_id;"))
+        using (DB db = new DB())
         {
+            var cmd = db.getCMD(@"DELETE FROM CHAT WHERE ID = @chat_id;");
             cmd.Parameters.AddWithValue("@chat_id", chat_id);
-            return Ok(await DB.execSQL(cmd));
+            return Ok(await db.exec());
         }
     }
 
@@ -51,29 +79,23 @@ public class ChatController : ControllerBase
         int id = await AccountController.GetID(email, password);
         if (id == 0) return Unauthorized();
 
-        using (var cmd = await DB.getCommand(@"SELECT POLICY FROM CHAT_TYPE_POLICY p INNER JOIN CHAT c ON c.TYPE = p.TYPE WHERE c.ID = @chat_id AND p.POLICY = ""OPEN"";"))
+        using (DB db = new DB())
         {
-
+            var cmd = db.getCMD(@"SELECT POLICY FROM CHAT_TYPE_POLICY p INNER JOIN CHAT c ON c.TYPE = p.TYPE WHERE c.ID = @chat_id AND p.POLICY = ""OPEN"";");
             cmd.Parameters.AddWithValue("@chat_id", chat_id);
 
-            var r = await DB.readSQL(cmd);
-            await r.ReadAsync();
-            if (r.HasRows)
-            {
-
-                await r.CloseAsync();
+            var table = await db.read();
+            if (table.Rows.Count == 0)
                 return BadRequest("Chat is not public");
-            }
-
-            
         }
 
-        using (var cmd = await DB.getCommand(@"INSERT INTO CHAT_USER (USER_ID, CHAT_ID, ROLE) VALUES (@id, @chat_id, ""USER"");"))
+        using (DB db = new DB())
         {
+            var cmd = db.getCMD(@"INSERT INTO CHAT_USER (USER_ID, CHAT_ID, ROLE) VALUES (@id, @chat_id, ""USER"");");
             cmd.Parameters.AddWithValue("@id", id);
             cmd.Parameters.AddWithValue("@chat_id", chat_id);
 
-            return Ok(await DB.execSQL(cmd));
+            return Ok(await db.exec());
         }
     }
 
@@ -83,18 +105,34 @@ public class ChatController : ControllerBase
         int id = await AccountController.GetID(email, password);
         if (id == 0) return Unauthorized();
 
-        using (var cmd = await DB.getCommand(@"(SELECT ID, NAME, TYPE, TAGS FROM CHAT WHERE TYPE = ""GROUP"" AND CONCAT(TAGS, ' ', NAME) 
-        LIKE @query) LIMIT @limit " // AND CHAT_PRIVACY_OPTIONS_NAME = 'CLOSED' 
-        // @"UNION SELECT u.ID, u.NAME, u.USER_TYPE_NAME TYPE FROM USER u 
-        // INNER JOIN USER_TYPE_PERMISSION p ON p.USER_TYPE_NAME = u.USER_TYPE_NAME WHERE CONCAT(u.USER_TYPE_NAME, ' ', NAME) 
-        // LIKE @query AND ID != ? AND p.USER_PERMISSIONS_PERMISSION = 'VISIBLE') LIMIT @limit;"
-        ))
+        using (DB db = new DB())
         {
-
+            var cmd = db.getCMD(@"(SELECT ID, NAME, TYPE, TAGS FROM CHAT WHERE TYPE = ""GROUP"" AND CONCAT(COALESCE(TAGS,''), ' ', NAME) 
+        LIKE @query) LIMIT @limit " // AND CHAT_PRIVACY_OPTIONS_NAME = 'CLOSED' 
+                                                                    // @"UNION SELECT u.ID, u.NAME, u.USER_TYPE_NAME TYPE FROM USER u 
+                                                                    // INNER JOIN USER_TYPE_PERMISSION p ON p.USER_TYPE_NAME = u.USER_TYPE_NAME WHERE CONCAT(u.USER_TYPE_NAME, ' ', NAME) 
+                                                                    // LIKE @query AND ID != ? AND p.USER_PERMISSIONS_PERMISSION = 'VISIBLE') LIMIT @limit;"
+        );
 
             cmd.Parameters.AddWithValue("@query", query ?? "");
             cmd.Parameters.AddWithValue("@limit", 10);
-            return Ok(await DB.readJSONSQL(cmd, DB.JSONFormat.Array));
+            return Ok(await db.readJSON());
+        }
+    }
+
+
+
+    [HttpGet("types")]
+    public async Task<IActionResult> GetTypes([FromHeader] string email, [FromHeader] string password)
+    {
+        int id = await AccountController.GetID(email, password);
+        if (id == 0) return Unauthorized();
+
+        using (DB db = new DB())
+        {
+            var cmd = db.getCMD("SELECT * FROM CHAT_TYPE cu INNER JOIN CHAT c ON c.ID = cu.CHAT_ID WHERE USER_ID = @id");
+            cmd.Parameters.AddWithValue("@id", id);
+            return Ok(await db.readJSON());
         }
     }
 
@@ -104,10 +142,11 @@ public class ChatController : ControllerBase
         int id = await AccountController.GetID(email, password);
         if (id == 0) return Unauthorized();
 
-        using (var cmd = await DB.getCommand("SELECT * FROM CHAT_USER cu INNER JOIN CHAT c ON c.ID = cu.CHAT_ID WHERE USER_ID = @id"))
+        using (DB db = new DB())
         {
+            var cmd = db.getCMD("SELECT * FROM CHAT_USER cu INNER JOIN CHAT c ON c.ID = cu.CHAT_ID WHERE USER_ID = @id");
             cmd.Parameters.AddWithValue("@id", id);
-            return Ok(await DB.readJSONSQL(cmd, DB.JSONFormat.Array));
+            return Ok(await db.readJSON());
         }
     }
 
@@ -118,23 +157,29 @@ public class ChatController : ControllerBase
         if (id == 0) return Unauthorized();
 
         long insert_id = 0;
-        using (var cmd = await DB.getCommand("INSERT INTO CHAT (TYPE, NAME, DESCRIPTION, TAGS) VALUES (@type, @name, @desc, @tags)"))
+
+        using (DB db = new DB())
         {
+            var cmd = db.getCMD("INSERT INTO CHAT (TYPE, NAME, DESCRIPTION, TAGS) VALUES (@type, @name, @desc, @tags)");
             cmd.Parameters.AddWithValue("@name", name);
             cmd.Parameters.AddWithValue("@desc", description);
             cmd.Parameters.AddWithValue("@tags", tags);
             cmd.Parameters.AddWithValue("@type", type);
-            if ((await DB.execSQL(cmd)) != 1) return Problem();
+
+            if ((await db.exec()) != 1) return Problem();
 
             insert_id = cmd.LastInsertedId;
         }
 
-        using (var cmd = await DB.getCommand("INSERT IGNORE INTO CHAT_USER (USER_ID, CHAT_ID, ROLE) VALUES(@user, @chat, \"ADMIN\")"))
+        using (DB db = new DB())
         {
+            var cmd = db.getCMD("INSERT IGNORE INTO CHAT_USER (USER_ID, CHAT_ID, ROLE) VALUES(@user, @chat, \"ADMIN\")");
             cmd.Parameters.AddWithValue("@user", id);
             cmd.Parameters.AddWithValue("@chat", insert_id);
 
-            return Ok(await DB.execSQL(cmd));
+            await db.exec();
+
+            return Ok(insert_id);
         }
     }
 
@@ -151,51 +196,46 @@ public class ChatController : ControllerBase
 
         //everything is allright
 
-
-
-        MySqlConnector.MySqlDataReader r;
-        using (var cmd = await DB.getCommand("SELECT cu.USER_ID, u.PUBLIC_KEY, GROUP_CONCAT(d.ID) \"DEVICES\" FROM CHAT_USER cu INNER JOIN USER u ON u.ID = cu.USER_ID LEFT JOIN DEVICE d ON d.USER_ID = u.ID AND d.USER_ID != @user WHERE CHAT_ID = @chat GROUP BY u.ID;"))
+        List<string> ids = new List<string>();
+        int message_id = 0;
+        using (DB db = new DB())
         {
+            var cmd = db.getCMD("SELECT cu.USER_ID, u.PUBLIC_KEY, GROUP_CONCAT(d.ID) \"DEVICES\" FROM CHAT_USER cu INNER JOIN USER u ON u.ID = cu.USER_ID LEFT JOIN DEVICE d ON d.USER_ID = u.ID AND d.USER_ID != @user WHERE CHAT_ID = @chat GROUP BY u.ID;");
             cmd.Parameters.AddWithValue("@chat", chat);
             cmd.Parameters.AddWithValue("@user", id);
 
-            r = await DB.readSQL(cmd);
-        }
-
-        int message_id = 0;
-
-        List<string> ids = new List<string>();
-        while (await r.ReadAsync())
-        {
-            int user_id = r.GetInt32("USER_ID");
-            string key = r.GetString("PUBLIC_KEY");
+            var table = await db.read();
 
 
-            if (!r.IsDBNull(2))
+            foreach (DataRow row in table.Rows)
             {
-                ids.AddRange(r.GetString("DEVICES").Split(","));
-            }
+                int user_id = Convert.ToInt32(row["USER_ID"]);
+                string key = Convert.ToString(row["PUBLIC_KEY"]) ?? "";
 
-            string cipher = Encryption.AsymmetricEncrypt(message, key);
+                string devices = Convert.ToString(row["DEVICES"]) ?? "";
+                if (devices != "")
+                {
+                    ids.AddRange(devices.Split(","));
+                }
 
-            using (var insertcmd = await DB.getCommand("INSERT INTO CHAT_MESSAGE (AUTHOR, RECEIVER, MESSAGE, CHAT_ID) VALUES(@author, @rec, @msg, @chat)"))
-            {
+                string cipher = Encryption.AsymmetricEncrypt(message, key);
+
+                var insertcmd = db.getCMD("INSERT INTO CHAT_MESSAGE (AUTHOR, RECEIVER, MESSAGE, CHAT_ID) VALUES(@author, @rec, @msg, @chat)");
+
                 insertcmd.Parameters.AddWithValue("@author", id);
                 insertcmd.Parameters.AddWithValue("@chat", chat);
                 insertcmd.Parameters.AddWithValue("@rec", user_id);
                 insertcmd.Parameters.AddWithValue("@msg", cipher);
 
-                await DB.execSQL(insertcmd);
+                await db.exec();
 
+                
                 if (user_id == id)
-                {
                     //We an to return the id of the inserted message for the user
                     message_id = (int)insertcmd.LastInsertedId;
-                }
+                
             }
         }
-        await r.CloseAsync();
-
 
         if (ids.Count > 0)
         {
@@ -215,11 +255,34 @@ public class ChatController : ControllerBase
             httpRequest.Content = new StringContent(content, Encoding.UTF8, "application/json");
             httpRequest.Headers.TryAddWithoutValidation("Authorization", Settings.ServerKey);
 
-            var response = await clientTest.SendAsync(httpRequest);
+            await clientTest.SendAsync(httpRequest);
         }
         return Ok(message_id);
 
     }
+
+    [HttpPost("{chat}/type")]
+    public async Task<IActionResult> SetType(int chat, [FromForm] string type, [FromHeader] string email, [FromHeader] string password)
+    {
+        int id = await AccountController.GetID(email, password);
+        if (id == 0) return Unauthorized();
+
+        //we authentificated our user
+        //is our User authentificated to send message?
+        if (!await HasUserChatPermission(id, chat, "EDIT")) return Unauthorized();
+
+        //everything is allright
+
+        using (DB db = new DB())
+        {
+            var cmd = db.getCMD("UPDATE CHAT SET TYPE = @type WHERE ID = @chat;");
+            cmd.Parameters.AddWithValue("@type", type);
+            cmd.Parameters.AddWithValue("@chat", chat);
+
+            return Ok(await db.exec());
+        }
+    }
+
 
     [HttpGet("{chat}/users")]
     public async Task<IActionResult> GetUsers(int chat, [FromHeader] string email, [FromHeader] string password)
@@ -233,11 +296,11 @@ public class ChatController : ControllerBase
 
         //everything is allright
 
-        using (var cmd = await DB.getCommand("SELECT ID, ROLE, USERNAME FROM CHAT_USER c INNER JOIN USER u ON u.ID = c.USER_ID WHERE CHAT_ID = @chat"))
+        using (DB db = new DB())
         {
+            var cmd =  db.getCMD("SELECT ID, ROLE, USERNAME FROM CHAT_USER c INNER JOIN USER u ON u.ID = c.USER_ID WHERE CHAT_ID = @chat");
             cmd.Parameters.AddWithValue("@chat", chat);
-
-            return Ok(await DB.readJSONSQL(cmd, DB.JSONFormat.Array));
+            return Ok(await db.readJSON());
         }
     }
 
@@ -252,12 +315,14 @@ public class ChatController : ControllerBase
 
         //everything is allright
 
-        using (var cmd = await DB.getCommand("SELECT PERMISSION FROM CHAT_ROLE_PERMISSION p INNER JOIN CHAT_USER u ON u.ROLE = p.ROLE WHERE u.USER_ID = @user_id AND u.CHAT_ID = @chat_id;"))
+        using (DB db = new DB())
         {
+
+        var cmd =  db.getCMD("SELECT PERMISSION FROM CHAT_ROLE_PERMISSION p INNER JOIN CHAT_USER u ON u.ROLE = p.ROLE WHERE u.USER_ID = @user_id AND u.CHAT_ID = @chat_id;");
             cmd.Parameters.AddWithValue("@chat_id", chat);
             cmd.Parameters.AddWithValue("@user_id", id);
 
-            return Ok(await DB.readJSONSQL(cmd, DB.JSONFormat.Array));
+            return Ok(await db.readJSON());
         }
     }
 
@@ -273,16 +338,18 @@ public class ChatController : ControllerBase
 
         //everything is allright
 
-        using (var cmd = await DB.getCommand("SELECT NAME, TAGS, DESCRIPTION, TYPE FROM CHAT WHERE ID = @chat"))
+        using (DB db = new DB())
         {
+
+            var cmd = db.getCMD("SELECT NAME, TAGS, DESCRIPTION, TYPE FROM CHAT WHERE ID = @chat");
             cmd.Parameters.AddWithValue("@chat", chat);
 
-            return Ok(await DB.readJSONSQL(cmd));
+            return Ok(await db.readJSON());
         }
     }
 
     [HttpPost("{chat}/info")]
-    public async Task<IActionResult> SetInfo(int chat, [FromForm] string name, [FromForm] string tags, [FromForm] string description, [FromHeader] string email, [FromHeader] string password)
+    public async Task<IActionResult> SetInfo(int chat, [FromForm] string name, [FromForm] string? tags, [FromForm] string? description, [FromHeader] string email, [FromHeader] string password)
     {
         int id = await AccountController.GetID(email, password);
         if (id == 0) return Unauthorized();
@@ -293,14 +360,15 @@ public class ChatController : ControllerBase
 
         //everything is allright
 
-        using (var cmd = await DB.getCommand("UPDATE CHAT SET NAME = @name, TAGS = @tags, DESCRIPTION = @desc WHERE ID = @chat;"))
+        using (DB db = new DB())
         {
+            var cmd = db.getCMD("UPDATE CHAT SET NAME = @name, TAGS = @tags, DESCRIPTION = @desc WHERE ID = @chat;");
             cmd.Parameters.AddWithValue("@name", name);
             cmd.Parameters.AddWithValue("@tags", tags);
             cmd.Parameters.AddWithValue("@desc", description);
             cmd.Parameters.AddWithValue("@chat", chat);
 
-            return Ok(await DB.execSQL(cmd));
+            return Ok(await db.exec());
         }
     }
 
@@ -316,64 +384,59 @@ public class ChatController : ControllerBase
 
         //everything is allright
 
-        MySqlConnector.MySqlDataReader r;
-        using (var cmd = await DB.getCommand("SELECT m.*, u.USERNAME FROM CHAT_MESSAGE m INNER JOIN USER u ON u.ID = m.AUTHOR WHERE CHAT_ID = @chat AND RECEIVER = @id ORDER BY SEND_TIME ASC"))
+        DataTable messageTable;
+        using (DB db = new DB())
         {
+            var cmd = db.getCMD("SELECT m.*, u.USERNAME FROM CHAT_MESSAGE m INNER JOIN USER u ON u.ID = m.AUTHOR WHERE CHAT_ID = @chat AND RECEIVER = @id ORDER BY SEND_TIME ASC");
             cmd.Parameters.AddWithValue("@chat", chat);
             cmd.Parameters.AddWithValue("@id", id);
-            r = await DB.readSQL(cmd);
+            messageTable = await db.read();
         }
 
         string private_key = await AccountController.GetPrivateKey(email, password);
 
 
         List<dynamic> messages = new List<dynamic>();
-        while (await r.ReadAsync())
+        foreach(DataRow row in messageTable.Rows)
         {
 
-            string msg = Encryption.AsymmetricDecrypt(r.GetString("MESSAGE"), private_key);
-            int author = r.GetInt32("AUTHOR");
-            string time = r.GetDateTime("SEND_TIME").ToString("yyyy-MM-dd HH:mm:ss");
-            string username = r.GetString("USERNAME");
-            int msg_id = r.GetInt32("ID");
-            messages.Add(new { message = msg, author = author, send_at = time, username = username, message_id = msg_id });
+            string message = Encryption.AsymmetricDecrypt( Convert.ToString(row["MESSAGE"]) ?? "", private_key);
+            int author = Convert.ToInt32(row["AUTHOR"]);
+            string send_at = Convert.ToDateTime(row["SEND_TIME"]).ToString("yyyy-MM-dd HH:mm:ss");
+            string username = Convert.ToString(row["USERNAME"]) ?? "";
+            int message_id = Convert.ToInt32(row["ID"]);
+            messages.Add(new { message, author, send_at, username, message_id });
         }
-        await r.CloseAsync();
 
-        using (var cmd = await DB.getCommand("SELECT NAME, TAGS, DESCRIPTION FROM CHAT WHERE ID = @chat"))
+        using (DB db = new DB())
         {
+
+        var cmd =  db.getCMD("SELECT NAME, TAGS, DESCRIPTION FROM CHAT WHERE ID = @chat");
             cmd.Parameters.AddWithValue("@chat", chat);
 
-            var r2 = await DB.readSQL(cmd);
-            await r2.ReadAsync();
-            var name = r2.GetString("NAME");
-            var tags = r2.GetString("TAGS");
-            var description = r2.GetString("DESCRIPTION");
+        var chatInfo =  await db.read();
 
-            await r.CloseAsync();
+            var name = Convert.ToString(chatInfo.Rows[0]["NAME"]);
+            var tags = Convert.ToString(chatInfo.Rows[0]["TAGS"]);
+            var description = Convert.ToString(chatInfo.Rows[0]["DESCRIPTION"]);
 
-            return Ok(new {name = name, tags = tags, description = description, messages = messages });
+
+            return Ok(new { name, tags, description, messages });
         }
     }
 
     [NonAction]
     public async Task<bool> HasUserChatPermission(int user, int chat, string permission)
     {
-        using (var cmd = await DB.getCommand("SELECT COUNT(*) FROM CHAT_USER WHERE USER_ID = @user AND CHAT_ID = @chat AND ROLE IN (SELECT ROLE FROM CHAT_ROLE_PERMISSION WHERE PERMISSION = @permission);"))
+        using (DB db = new DB())
         {
+            var cmd = db.getCMD("SELECT COUNT(*) C FROM CHAT_USER WHERE USER_ID = @user AND CHAT_ID = @chat AND ROLE IN (SELECT ROLE FROM CHAT_ROLE_PERMISSION WHERE PERMISSION = @permission);");
             cmd.Parameters.AddWithValue("@user", user);
             cmd.Parameters.AddWithValue("@chat", chat);
             cmd.Parameters.AddWithValue("@permission", "WRITE");
 
-            var r = await DB.readSQL(cmd);
-            await r.ReadAsync();
-
-            var hasPermission = r.GetInt32(0);
-            await r.CloseAsync();
-            return hasPermission > 0;
+            var table = await db.read();
+            return Convert.ToInt32(table.Rows[0]["C"]) > 0;
         }
     }
-
-
-
 }

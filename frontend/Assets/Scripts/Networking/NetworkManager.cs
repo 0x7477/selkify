@@ -13,7 +13,7 @@ public static class NetworkManager
     {
         try
         {
-            var www = UnityWebRequest.Get(url);
+            var www = UnityWebRequest.Get(Uri.EscapeUriString(url));
 
             if(UserInformation.email != null)
                 www.SetRequestHeader("email", UserInformation.email);
@@ -44,7 +44,7 @@ public static class NetworkManager
     {
         try
         {
-            var www = UnityWebRequest.Post(url, form);
+            var www = UnityWebRequest.Post(Uri.EscapeUriString(url), form);
 
             if(UserInformation.email != null)
             www.SetRequestHeader("email", UserInformation.email);

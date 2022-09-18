@@ -10,9 +10,11 @@ using System.Linq;
 public class ChatSettingsWindow : Window
 {
 
-    public Button back, save, delete;
+    public Button back, save, delete, leave;
     public TMPro.TMP_InputField chatname, tags, description;
     public GameObject MemberEntry;
+
+    public TMPro.TMP_Dropdown type;
     public Transform content;
 
     public int chat_id;
@@ -22,18 +24,18 @@ public class ChatSettingsWindow : Window
         return "CHAT_SETTINGS";
     }
 
-    public void InitSettings(JObject settings)
+    public void InitSettings(JArray settings)
     {
-        chatname.text = (string)settings["NAME"];
-        tags.text = (string)settings["TAGS"];
-        description.text = (string)settings["DESCRIPTION"];
+        chatname.text = (string)settings[0]["NAME"];
+        tags.text = (string)settings[0]["TAGS"];
+        description.text = (string)settings[0]["DESCRIPTION"];
     }
 
     public void InitMember(JArray members)
     {
         var options = new List<string>() { "ADMIN", "USER", "KICK" };
 
-        Clear(content, 6, 0);
+        Clear(content, 7, 0);
 
         foreach (JObject member in members)
         {
@@ -66,33 +68,89 @@ public class ChatSettingsWindow : Window
 
     }
 
-    public void InitDelete(int id)
+    public void InitType(JArray settings)
     {
+        string type_string = (string)settings[0]["TYPE"];
+
+        //select type
+        int index = -1;
+        foreach (var i in type.options)
+        {
+            index++;
+            if (i.text != type_string) continue;
+            type.value = index;
+        }
+
+        type.onValueChanged.AddListener(async (int val) =>
+        {
+            await WindowManager.StartLoading();
+
+            Dictionary<string, string> form = new Dictionary<string, string>() { { "type", type.options[val].text } };
+            var wr = await NetworkManager.PostWR(AppSettings.API_URL + "chat/" + chat_id + "/type", form);
+
+            if (wr.result != UnityWebRequest.Result.Success) return;
+
+
+            await WindowManager.StopLoading();
+            await WindowManager.Navigate("CHAT_LIST");
+
+
+        });
+
+    }
+
+    public void InitLeave()
+    {
+        leave.onClick.RemoveAllListeners();
+        leave.onClick.AddListener(async () =>
+        {
+            var wr = await NetworkManager.GetWR(AppSettings.API_URL + "chat/" + chat_id + "/leave");
+
+            if (wr.result != UnityWebRequest.Result.Success) return;
+
+            await WindowManager.Navigate("CHAT_LIST");
+        });
+    }
+
+    public void InitDelete()
+    {
+        delete.onClick.RemoveAllListeners();
         delete.onClick.AddListener(async () =>
         {
-            await NetworkManager.Get(AppSettings.API_URL + "chat/" + chat_id + "/delete");
+            var wr = await NetworkManager.GetWR(AppSettings.API_URL + "chat/" + chat_id + "/delete");
+
+            if (wr.result != UnityWebRequest.Result.Success) return;
+
             await WindowManager.Navigate("CHAT_LIST");
         });
     }
 
     public static bool ContainsString(JArray jArray, string s)
     {
-        return jArray.Any(x => x.ToString().Equals(s));
+        foreach (JObject o in jArray)
+        {
+            if ((string)o["PERMISSION"] == s) return true;
+        }
+        return false;
     }
     public async Task LoadSettings(int id)
     {
         await WindowManager.StartLoading();
         var permissions = JArray.Parse(await NetworkManager.Get(AppSettings.API_URL + "chat/" + id + "/permissions"));
 
-        Debug.Log(permissions);
         if (ContainsString(permissions, "EDIT"))
-            InitSettings(JObject.Parse(await NetworkManager.Get(AppSettings.API_URL + "chat/" + id + "/info")));
-
+        {
+            var info = JArray.Parse(await NetworkManager.Get(AppSettings.API_URL + "chat/" + id + "/info"));
+            InitSettings(info);
+            InitType(info);
+        }
         if (ContainsString(permissions, "READ"))
             InitMember(JArray.Parse(await NetworkManager.Get(AppSettings.API_URL + "chat/" + id + "/users")));
 
         if (ContainsString(permissions, "DELETE"))
-            InitDelete(id);
+            InitDelete();
+
+        InitLeave();
 
         await WindowManager.StopLoading();
     }

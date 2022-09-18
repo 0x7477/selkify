@@ -21,7 +21,6 @@ public class ChatWindow : Window
     public ScrollRect rect;
 
     private TMPro.TMP_Text t;
-    public int id;
 
     public override string GetID()
     {
@@ -64,7 +63,9 @@ public class ChatWindow : Window
     }
     public void InitChat(JObject messages)
     {
+        latestmessage = DateTime.MinValue;
         Clear(chathistoryContent);
+        
         chatname.text = (string)messages["name"];
 
         foreach (JObject message in messages["messages"])

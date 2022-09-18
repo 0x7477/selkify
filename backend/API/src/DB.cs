@@ -1,29 +1,54 @@
 using System;
 using MySqlConnector;
 using Newtonsoft.Json;
-public class DB
+using System.Data;
+public class DB : IDisposable
 {
-
-    public static async Task<MySqlConnection> getOpenConnection()
+    private MySqlConnection conn;
+    private MySqlCommand? cmd;
+    public DB()
     {
-        var c = new MySqlConnection(Settings.dbconn);
-        await c.OpenAsync();
-        return c;
+        conn = new MySqlConnection(Settings.dbconn);
+        conn.Open();
     }
 
-    public static async Task<MySqlCommand> getCommand()
+    public void Dispose()
     {
-        return (await getOpenConnection()).CreateCommand();
+        conn.Close();
     }
 
-    public static async Task<MySqlCommand> getCommand(string sql)
+    public MySqlConnection getConnection()
     {
-        var cmd = await getCommand();
-        cmd.CommandText = sql;
+        return conn;
+    }
+
+    public MySqlCommand getCMD(string sql)
+    {
+        cmd = new MySqlCommand(sql, conn);
         return cmd;
     }
 
+    public async Task<int> exec()
+    {
+        if(cmd == null) return 0;
+        return await cmd.ExecuteNonQueryAsync();
+    }
 
+    public async Task<DataTable> read()
+    {
+        DataTable dt = new DataTable();
+        if(cmd == null) return dt;
+
+        dt.Load(await cmd.ExecuteReaderAsync());
+        return dt;
+    }
+
+    public async Task<string> readJSON()
+    {
+        return JsonConvert.SerializeObject(await read());
+    }
+
+    /*
 
     public static async Task<MySqlConnector.MySqlDataReader> readSQL(string sql)
     {
@@ -146,4 +171,5 @@ public class DB
 
         return val;
     }
+    */
 }

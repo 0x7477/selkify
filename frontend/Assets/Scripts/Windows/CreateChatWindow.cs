@@ -35,6 +35,7 @@ public class CreateChatWindow : Window
         if (s.result != UnityWebRequest.Result.Success)
             return;
 
+        Debug.Log(s.downloadHandler.text);
         string[] strings = { s.downloadHandler.text };
         await WindowManager.Navigate("CHAT", strings);
 
